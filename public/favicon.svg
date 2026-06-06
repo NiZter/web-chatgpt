@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Tro ly OpenAI">
+  <rect width="64" height="64" rx="14" fill="oklch(0.56 0.18 286)" />
+  <path
+    d="M32 12l4.8 12.5L50 29.2l-12.4 5.1L32 52l-5.6-17.7L14 29.2l13.2-4.7L32 12z"
+    fill="white"
+  />
+  <circle cx="45" cy="17" r="5" fill="oklch(0.67 0.16 34)" />
+</svg>

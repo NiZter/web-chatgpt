@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: web-chatgpt-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: node server/proxy.mjs
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_API_URL
+        value: https://api.openai.com/v1/responses
+      - key: OPENAI_API_KEY
+        sync: false

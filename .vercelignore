@@ -1,0 +1,11 @@
+.env
+.env.*
+node_modules
+dist
+test-results
+output
+.playwright-cli
+.codex-api.log
+.codex-api.err.log
+.codex-vite.log
+.codex-vite.err.log
