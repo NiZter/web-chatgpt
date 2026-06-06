@@ -13,9 +13,22 @@ export type AssistantResponse = {
   source: 'mock' | 'api';
 };
 
+export type ImageGenerationRequest = {
+  prompt: string;
+};
+
+export type ImageGenerationResponse = {
+  imageUrl: string;
+  model: string;
+  source: 'mock' | 'api';
+};
+
 const shouldUseMock =
   import.meta.env.VITE_USE_MOCK_RESPONSES !== 'false' ||
   !import.meta.env.VITE_OPENAI_PROXY_URL;
+const imageProxyUrl =
+  import.meta.env.VITE_OPENAI_IMAGE_PROXY_URL ||
+  import.meta.env.VITE_OPENAI_PROXY_URL?.replace(/\/api\/openai\/responses\/?$/, '/api/openai/images');
 
 export async function sendAssistantRequest(request: AssistantRequest): Promise<AssistantResponse> {
   if (shouldUseMock) {
@@ -38,6 +51,34 @@ export async function sendAssistantRequest(request: AssistantRequest): Promise<A
   const data = await response.json();
   return {
     text: extractResponseText(data),
+    source: 'api',
+  };
+}
+
+export async function generateImageRequest(
+  request: ImageGenerationRequest,
+): Promise<ImageGenerationResponse> {
+  if (shouldUseMock || !imageProxyUrl) {
+    return mockImageGenerationResponse(request);
+  }
+
+  const response = await fetch(imageProxyUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || 'Không thể tạo ảnh bằng API OpenAI.');
+  }
+
+  const data = await response.json();
+  return {
+    imageUrl: extractImageUrl(data),
+    model: extractImageModel(data),
     source: 'api',
   };
 }
@@ -106,6 +147,45 @@ export function toResponsesPayload(request: AssistantRequest) {
   }
 
   return payload;
+}
+
+function extractImageUrl(data: unknown): string {
+  const output = data as {
+    image_url?: unknown;
+    url?: unknown;
+    b64_json?: unknown;
+    data?: Array<{ b64_json?: unknown; url?: unknown }>;
+  };
+  const directUrl = typeof output.image_url === 'string' ? output.image_url : output.url;
+  if (typeof directUrl === 'string' && directUrl.trim()) {
+    return directUrl;
+  }
+
+  const directBase64 = typeof output.b64_json === 'string' ? output.b64_json : '';
+  if (directBase64.trim()) {
+    return toImageDataUrl(directBase64);
+  }
+
+  const firstImage = output.data?.find((item) => item?.b64_json || item?.url);
+  if (typeof firstImage?.url === 'string' && firstImage.url.trim()) {
+    return firstImage.url;
+  }
+
+  if (typeof firstImage?.b64_json === 'string' && firstImage.b64_json.trim()) {
+    return toImageDataUrl(firstImage.b64_json);
+  }
+
+  throw new Error('API đã trả về kết quả nhưng chưa có dữ liệu ảnh.');
+}
+
+function extractImageModel(data: unknown) {
+  const model = (data as { model?: unknown })?.model;
+  return typeof model === 'string' && model.trim() ? model : 'gpt-image-2';
+}
+
+function toImageDataUrl(value: string) {
+  if (value.startsWith('data:image/')) return value;
+  return `data:image/png;base64,${value}`;
 }
 
 function buildUserContent(prompt: string, attachments: MessageAttachment[]) {
@@ -202,6 +282,52 @@ async function mockAssistantResponse(request: AssistantRequest): Promise<Assista
       .filter(Boolean)
       .join('\n'),
   };
+}
+
+async function mockImageGenerationResponse(
+  request: ImageGenerationRequest,
+): Promise<ImageGenerationResponse> {
+  await new Promise((resolve) => window.setTimeout(resolve, 900));
+
+  const svg = [
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">',
+    '<defs>',
+    '<linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">',
+    '<stop offset="0" stop-color="#f8fbff"/>',
+    '<stop offset="0.58" stop-color="#e8f0ff"/>',
+    '<stop offset="1" stop-color="#ffe9d8"/>',
+    '</linearGradient>',
+    '</defs>',
+    '<rect width="1024" height="1024" fill="url(#bg)"/>',
+    '<rect x="104" y="128" width="816" height="768" rx="40" fill="#ffffff" opacity="0.82"/>',
+    '<circle cx="704" cy="326" r="116" fill="#7c3aed" opacity="0.18"/>',
+    '<circle cx="328" cy="682" r="168" fill="#f97316" opacity="0.16"/>',
+    '<path d="M258 612c116-172 222-188 338-44 52 64 106 82 174 52 42-18 76 16 58 58-37 86-142 142-274 142-162 0-296-82-296-208Z" fill="#4338ca" opacity="0.82"/>',
+    '<path d="M258 612c96-74 184-66 266 24 65 71 144 88 238 50" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" opacity="0.78"/>',
+    `<text x="128" y="192" fill="#1f2937" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="800">Ảnh AI demo</text>`,
+    `<text x="128" y="250" fill="#4b5563" font-family="Inter, Arial, sans-serif" font-size="24">${escapeSvgText(request.prompt).slice(0, 58)}</text>`,
+    '<text x="128" y="836" fill="#6b7280" font-family="Inter, Arial, sans-serif" font-size="20">Kết nối API thật để tạo ảnh bằng gpt-image-2.</text>',
+    '</svg>',
+  ].join('');
+
+  return {
+    imageUrl: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+    model: 'gpt-image-2',
+    source: 'mock',
+  };
+}
+
+function escapeSvgText(value: string) {
+  return value.replace(/[&<>"']/g, (char) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&apos;',
+    };
+    return entities[char];
+  });
 }
 
 function findPriorFileContext(messages: Message[]) {

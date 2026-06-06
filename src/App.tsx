@@ -36,15 +36,17 @@ import {
 import {
   createDocxArtifact,
   createDocxArtifactFromRequest,
+  createImageArtifact,
   createPdfArtifact,
   createPdfArtifactFromRequest,
   createTextArtifact,
+  downloadImageArtifact,
   downloadDocxArtifact,
   downloadPdfArtifact,
   downloadTextArtifact,
 } from './lib/documentArtifacts';
 import { loadTaskSkill, type LoadedTaskSkill } from './lib/skillClient';
-import { sendAssistantRequest } from './lib/openaiClient';
+import { generateImageRequest, sendAssistantRequest } from './lib/openaiClient';
 import type { AssistantSettings, Message, MessageArtifact, MessageAttachment, ModelOption, TaskTemplate } from './types';
 
 type SpeechRecognitionEventResult = {
@@ -82,6 +84,8 @@ type DemoAccount = {
   displayName: string;
 };
 
+type ComposerMode = 'chat' | 'image';
+
 const demoAccounts: DemoAccount[] = [
   { username: 'cholo', password: 'cholo040312', displayName: 'cholo' },
   { username: 'xoisuon', password: 'thaonguyen1002', displayName: 'xoisuon' },
@@ -113,6 +117,7 @@ const reasoningLabels: Record<AssistantSettings['reasoningEffort'], string> = {
   xhigh: 'Rất kỹ',
 };
 const taskCategoryOrder: TaskTemplate['category'][] = ['Học tập', 'Viết', 'Công việc', 'Phân tích'];
+const imageGenerationModelLabel = 'GPT Image 2';
 
 function toSkillCommand(skillId: string) {
   return `$${skillId}`;
@@ -134,6 +139,7 @@ function App() {
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const [attachmentNotice, setAttachmentNotice] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [composerMode, setComposerMode] = useState<ComposerMode>('chat');
   const [settings, setSettings] = useState<AssistantSettings>({
     model: defaultModelId,
     taskId: 'general-chat',
@@ -196,11 +202,17 @@ function App() {
     (message) => message.role === 'assistant' && message.id !== 'welcome',
   );
   const lastAssistant = assistantMessages[assistantMessages.length - 1];
+  const lastAssistantHasImage = Boolean(
+    lastAssistant?.artifacts?.some((artifact) => artifact.kind === 'image'),
+  );
   const visibleMessages = messages.filter((message) => message.id !== 'welcome');
   const hasConversation = visibleMessages.length > 0;
   const readyAttachments = attachments.filter((attachment) => attachment.status === 'ready');
   const hasPendingAttachments = attachments.some((attachment) => attachment.status === 'processing');
-  const canSubmit = Boolean(prompt.trim() || readyAttachments.length) && !isSending && !hasPendingAttachments;
+  const canSubmit =
+    (composerMode === 'image' ? Boolean(prompt.trim()) : Boolean(prompt.trim() || readyAttachments.length)) &&
+    !isSending &&
+    !hasPendingAttachments;
   const browserSupportsSpeechRecognition =
     typeof window !== 'undefined' &&
     Boolean(
@@ -365,6 +377,28 @@ function App() {
     try {
       setPrompt('');
       setAttachments([]);
+
+      if (composerMode === 'image') {
+        const response = await generateImageRequest({ prompt: trimmedPrompt });
+        const imageArtifact = createImageArtifact({
+          dataUrl: response.imageUrl,
+          prompt: trimmedPrompt,
+        });
+
+        setMessages((current) => [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: `Đã tạo ảnh theo mô tả của bạn. Bấm **Tải ảnh PNG** để lưu về máy.`,
+            createdAt: new Date().toISOString(),
+            meta: response.source === 'api' ? response.model : `${imageGenerationModelLabel} demo`,
+            artifacts: [imageArtifact],
+          },
+        ]);
+        return;
+      }
+
       const skillForRequest = await loadTaskSkill(activeTask.skillId, activeTask.skillLabel);
       const response = await sendAssistantRequest({
         prompt: requestPrompt,
@@ -437,6 +471,11 @@ function App() {
   }
 
   async function downloadArtifact(artifact: MessageArtifact) {
+    if (artifact.kind === 'image') {
+      await downloadImageArtifact(artifact);
+      return;
+    }
+
     if (artifact.kind === 'docx') {
       await downloadDocxArtifact(artifact);
       return;
@@ -472,6 +511,7 @@ function App() {
     setPrompt('');
     setAttachments([]);
     setAttachmentNotice('');
+    setComposerMode('chat');
     recognitionRef.current?.stop();
     setIsListening(false);
     window.setTimeout(() => composerRef.current?.focus(), 0);
@@ -625,6 +665,11 @@ function App() {
                 <strong>{visibleMessages.length}</strong>
                 <span>tin trong phiên</span>
               </div>
+              <div>
+                <Image size={18} />
+                <strong>{composerMode === 'image' ? imageGenerationModelLabel : activeModel.label}</strong>
+                <span>{composerMode === 'image' ? 'model tạo ảnh' : 'model chat'}</span>
+              </div>
             </div>
 
             <div className="active-skill-banner" aria-label="Skill đang áp dụng trong chat">
@@ -716,18 +761,22 @@ function App() {
                   {isCopied ? <Check size={16} /> : <Clipboard size={16} />}
                   {isCopied ? 'Đã copy' : 'Copy câu trả lời'}
                 </button>
-                <button type="button" onClick={() => void downloadLastAnswerAsTxt()}>
-                  <FileUp size={16} />
-                  Tải TXT
-                </button>
-                <button type="button" onClick={() => void downloadLastAnswerAsDocx()}>
-                  <FileUp size={16} />
-                  Tải DOCX
-                </button>
-                <button type="button" onClick={() => void downloadLastAnswerAsPdf()}>
-                  <FileUp size={16} />
-                  Tải PDF
-                </button>
+                {!lastAssistantHasImage && (
+                  <>
+                    <button type="button" onClick={() => void downloadLastAnswerAsTxt()}>
+                      <FileUp size={16} />
+                      Tải TXT
+                    </button>
+                    <button type="button" onClick={() => void downloadLastAnswerAsDocx()}>
+                      <FileUp size={16} />
+                      Tải DOCX
+                    </button>
+                    <button type="button" onClick={() => void downloadLastAnswerAsPdf()}>
+                      <FileUp size={16} />
+                      Tải PDF
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
@@ -762,6 +811,31 @@ function App() {
                   event.currentTarget.value = '';
                 }}
               />
+              <div className="composer-mode" aria-label="Chọn chế độ gửi">
+                <button
+                  className={composerMode === 'chat' ? 'is-selected' : ''}
+                  type="button"
+                  aria-pressed={composerMode === 'chat'}
+                  onClick={() => setComposerMode('chat')}
+                >
+                  <MessageSquareText size={16} />
+                  Chat
+                </button>
+                <button
+                  className={composerMode === 'image' ? 'is-selected' : ''}
+                  type="button"
+                  aria-pressed={composerMode === 'image'}
+                  onClick={() => {
+                    setComposerMode('image');
+                    setAttachmentNotice('');
+                    window.setTimeout(() => composerRef.current?.focus(), 0);
+                  }}
+                >
+                  <Image size={16} />
+                  Tạo ảnh
+                </button>
+                <span>{composerMode === 'image' ? `Tự dùng ${imageGenerationModelLabel}` : activeModel.label}</span>
+              </div>
               <textarea
                 ref={composerRef}
                 value={prompt}
@@ -771,7 +845,11 @@ function App() {
                     void submitPrompt();
                   }
                 }}
-                placeholder="Nhập yêu cầu của bạn..."
+                placeholder={
+                  composerMode === 'image'
+                    ? 'Mô tả ảnh muốn tạo, ví dụ: poster sản phẩm phong cách tối giản, nền sáng...'
+                    : 'Nhập yêu cầu của bạn...'
+                }
                 rows={4}
               />
               {attachments.length > 0 && (
@@ -1186,7 +1264,7 @@ function SettingsDrawer({
         <details className="api-instructions">
           <summary>Dành cho người triển khai API</summary>
           <p>
-            Tạo backend route <code>/api/openai/responses</code>, giữ API key ở server, rồi đặt{' '}
+            Tạo backend route <code>/api/openai/responses</code> và <code>/api/openai/images</code>, giữ API key ở server, rồi đặt{' '}
             <code>VITE_USE_MOCK_RESPONSES=false</code>. UI sẽ gọi payload từ{' '}
             <code>src/lib/openaiClient.ts</code>.
           </p>
@@ -1245,10 +1323,15 @@ function ArtifactList({
   return (
     <div className="artifact-list" aria-label="File đã tạo">
       {artifacts.map((artifact) => (
-        <button key={artifact.id} type="button" onClick={() => void onDownload(artifact)}>
-          <FileUp size={16} />
-          Tải {artifact.filename}
-        </button>
+        <div className={`artifact-item ${artifact.kind}`} key={artifact.id}>
+          {artifact.kind === 'image' && (
+            <img className="generated-image" src={artifact.content} alt={artifact.prompt || 'Ảnh tạo bởi AI'} />
+          )}
+          <button type="button" onClick={() => void onDownload(artifact)}>
+            <FileUp size={16} />
+            {artifact.kind === 'image' ? 'Tải ảnh PNG' : `Tải ${artifact.filename}`}
+          </button>
+        </div>
       ))}
     </div>
   );

@@ -1136,13 +1136,28 @@ select {
 }
 
 .artifact-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 8px;
   margin-top: 10px;
 }
 
-.artifact-list button {
+.artifact-item {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.generated-image {
+  display: block;
+  width: min(440px, 100%);
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  object-fit: contain;
+}
+
+.artifact-item button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1157,7 +1172,7 @@ select {
   font-weight: 850;
 }
 
-.artifact-list button:hover {
+.artifact-item button:hover {
   border-color: var(--primary);
   background: oklch(0.89 0.06 278);
 }
@@ -1227,6 +1242,42 @@ select {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--bg);
+}
+
+.composer-mode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 10px 0;
+}
+
+.composer-mode button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.composer-mode button.is-selected {
+  color: white;
+  background: var(--primary);
+}
+
+.composer-mode > span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .composer textarea {
@@ -1833,6 +1884,19 @@ code {
   .composer-footer {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .composer-mode {
+    flex-wrap: wrap;
+  }
+
+  .composer-mode button {
+    flex: 1 1 120px;
+    min-height: 42px;
+  }
+
+  .composer-mode > span {
+    flex-basis: 100%;
   }
 
   .composer-tools button {

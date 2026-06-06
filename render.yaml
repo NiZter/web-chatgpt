@@ -12,5 +12,9 @@ services:
         value: production
       - key: OPENAI_API_URL
         value: https://luongchidung.online/v1/responses
+      - key: OPENAI_IMAGE_API_URL
+        sync: false
+      - key: OPENAI_IMAGE_MODEL
+        value: gpt-image-2
       - key: OPENAI_API_KEY
         sync: false

@@ -18,9 +18,11 @@ export type MessageAttachment = {
 
 export type MessageArtifact = {
   id: string;
-  kind: 'docx' | 'txt' | 'pdf';
+  kind: 'docx' | 'txt' | 'pdf' | 'image';
   filename: string;
   content: string;
+  mimeType?: string;
+  prompt?: string;
 };
 
 export type Message = {

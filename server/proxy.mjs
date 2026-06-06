@@ -7,6 +7,8 @@ loadEnv(envPath);
 
 const port = Number(process.env.PORT || 3001);
 const apiUrl = cleanEnv(process.env.OPENAI_API_URL || 'https://api.openai.com/v1/responses');
+const imageApiUrl = cleanEnv(process.env.OPENAI_IMAGE_API_URL || deriveImageApiUrl(apiUrl));
+const imageModel = cleanEnv(process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2');
 const apiKey = cleanEnv(process.env.OPENAI_API_KEY || '');
 const codexHome = resolve(
   cleanEnv(process.env.CODEX_HOME || process.env.USERPROFILE || process.env.HOME || '.'),
@@ -54,6 +56,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && requestUrl.pathname === '/api/openai/images') {
+    await sendGeneratedImage(req, res);
+    return;
+  }
+
   if (req.method !== 'POST' || requestUrl.pathname !== '/api/openai/responses') {
     sendJson(res, 404, { error: 'Not found' });
     return;
@@ -90,6 +97,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(port, host, () => {
   console.log(`OpenAI proxy running at http://${host}:${port}/api/openai/responses`);
+  console.log(`OpenAI image proxy running at http://${host}:${port}/api/openai/images`);
 });
 
 function loadEnv(path) {
@@ -116,6 +124,10 @@ function cleanEnv(value) {
     .trim()
     .replace(/^["']|["']$/g, '')
     .trim();
+}
+
+function deriveImageApiUrl(url) {
+  return cleanEnv(url).replace(/\/responses\/?$/, '/images/generations') || 'https://api.openai.com/v1/images/generations';
 }
 
 function setCorsHeaders(res) {
@@ -146,6 +158,49 @@ function readRequestBody(req) {
     req.on('end', () => resolveBody(body));
     req.on('error', reject);
   });
+}
+
+async function sendGeneratedImage(req, res) {
+  if (!apiKey || apiKey === 'PASTE_YOUR_API_KEY_HERE') {
+    sendJson(res, 500, { error: 'OPENAI_API_KEY is missing in .env' });
+    return;
+  }
+
+  try {
+    const body = await readRequestBody(req);
+    const payload = JSON.parse(body || '{}');
+    const prompt = typeof payload.prompt === 'string' ? payload.prompt.trim() : '';
+
+    if (!prompt) {
+      sendJson(res, 400, { error: 'Prompt is required to generate an image' });
+      return;
+    }
+
+    const upstream = await fetch(imageApiUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: imageModel,
+        prompt,
+        size: typeof payload.size === 'string' ? payload.size : '1024x1024',
+        n: 1,
+      }),
+    });
+
+    const text = await upstream.text();
+    res.writeHead(upstream.status, {
+      'Content-Type': upstream.headers.get('content-type') || 'application/json',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.end(text);
+  } catch (error) {
+    sendJson(res, 500, {
+      error: error instanceof Error ? error.message : 'Unknown image proxy error',
+    });
+  }
 }
 
 function sendSkill(req, res, skillId) {

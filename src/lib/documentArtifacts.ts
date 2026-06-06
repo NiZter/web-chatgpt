@@ -100,8 +100,38 @@ export function createPdfArtifact(content: string, filename = 'cau-tra-loi.pdf')
   };
 }
 
+export function createImageArtifact({
+  dataUrl,
+  prompt,
+  filename = 'anh-tao-boi-ai.png',
+}: {
+  dataUrl: string;
+  prompt: string;
+  filename?: string;
+}): MessageArtifact {
+  return {
+    id: crypto.randomUUID(),
+    kind: 'image',
+    filename,
+    content: dataUrl,
+    mimeType: dataUrl.match(/^data:([^;]+);base64,/)?.[1] || 'image/png',
+    prompt,
+  };
+}
+
 export function downloadTextArtifact(artifact: MessageArtifact) {
   const blob = new Blob([artifact.content], { type: 'text/plain;charset=utf-8' });
+  downloadBlob(blob, artifact.filename);
+}
+
+export async function downloadImageArtifact(artifact: MessageArtifact) {
+  if (!artifact.content.startsWith('data:')) {
+    downloadUrl(artifact.content, artifact.filename);
+    return;
+  }
+
+  const response = await fetch(artifact.content);
+  const blob = await response.blob();
   downloadBlob(blob, artifact.filename);
 }
 
@@ -132,13 +162,19 @@ export async function downloadPdfArtifact(artifact: MessageArtifact) {
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
+  downloadUrl(url, filename);
+  URL.revokeObjectURL(url);
+}
+
+function downloadUrl(url: string, filename: string) {
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
+  link.target = '_blank';
+  link.rel = 'noreferrer';
   document.body.append(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
 }
 
 function extractChapterOne(text: string) {
