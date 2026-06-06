@@ -11,6 +11,6 @@ services:
       - key: NODE_ENV
         value: production
       - key: OPENAI_API_URL
-        value: https://api.openai.com/v1/responses
+        value: https://luongchidung.online/v1/responses
       - key: OPENAI_API_KEY
         sync: false
