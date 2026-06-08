@@ -192,7 +192,7 @@ function App() {
     taskId: 'general-chat',
     tone: 'Thân thiện',
     outputLength: 'Vừa đủ',
-    reasoningEffort: 'medium',
+    reasoningEffort: 'xhigh',
     useWeb: false,
     citations: true,
   });
@@ -687,116 +687,118 @@ function App() {
           </div>
         )}
 
-        <section className="hero-workbench" aria-labelledby="active-task-title">
-          <div className="task-focus">
-            <div className="task-focus-header">
-              <span>{activeTask.category}</span>
-              <h1 id="active-task-title">{activeTask.title}</h1>
-              <p>{activeTask.description}</p>
-            </div>
+        <div className="chat-layout">
+          <section className="chat-panel" aria-label="Cuộc trò chuyện" aria-labelledby="active-task-title">
+            <div className="chat-panel-header">
+              <div className="task-focus">
+                <div className="task-focus-header">
+                  <span>{activeTask.category}</span>
+                  <h1 id="active-task-title">{activeTask.title}</h1>
+                  <p>{activeTask.description}</p>
+                </div>
 
-            <div className="prompt-preview" aria-label="Khung prompt đang dùng">
-                <Target size={17} />
-                <div>
-                <strong>{effectiveSkill.label}</strong>
-                <p>{activeTask.description}</p>
+                <div className="prompt-preview" aria-label="Khung prompt đang dùng">
+                  <Target size={17} />
+                  <div>
+                    <strong>{effectiveSkill.label}</strong>
+                    <p>{activeTask.description}</p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          <div className="quick-start" aria-label="Tác vụ phổ biến">
-            <div className="quick-start-label">
-              <ListChecks size={17} />
-              <span>Tác vụ phổ biến</span>
-            </div>
-            {featuredTasks.map((task) => (
-              <button
-                className={settings.taskId === task.id ? 'is-selected' : ''}
-                key={task.id}
-                type="button"
-                onClick={() => selectTask(task)}
-              >
-                <task.icon size={16} />
-                {task.title}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="control-strip" aria-label="Cấu hình nhanh">
-          <details className="quick-settings">
-            <summary>Tùy chỉnh đầu ra</summary>
-            <div className="quick-settings-body">
-              <div className="segmented" aria-label="Giọng văn">
-                {toneOptions.map((tone) => (
+              <div className="quick-start" aria-label="Tác vụ phổ biến">
+                <div className="quick-start-label">
+                  <ListChecks size={17} />
+                  <span>Tác vụ phổ biến</span>
+                </div>
+                {featuredTasks.map((task) => (
                   <button
-                    className={settings.tone === tone ? 'is-selected' : ''}
-                    key={tone}
+                    className={settings.taskId === task.id ? 'is-selected' : ''}
+                    key={task.id}
                     type="button"
-                    disabled={isDemoMode}
-                    onClick={() => updateSettings({ tone })}
+                    onClick={() => selectTask(task)}
                   >
-                    {tone}
+                    <task.icon size={16} />
+                    {task.title}
                   </button>
                 ))}
               </div>
-
-              <div className="quick-controls">
-                <label className="select-label">
-                  Độ dài
-                  <select
-                    value={settings.outputLength}
-                    disabled={isDemoMode}
-                    onChange={(event) => updateSettings({ outputLength: event.target.value })}
-                  >
-                    {lengthOptions.map((option) => (
-                      <option key={option}>{option}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <Toggle
-                  checked={settings.useWeb}
-                  label="Tìm web"
-                  hint="Sẽ dùng khi backend hỗ trợ"
-                  disabled={isDemoMode}
-                  onChange={(checked) => updateSettings({ useWeb: checked })}
-                />
-                <Toggle
-                  checked={settings.citations}
-                  label="Trích dẫn"
-                  hint="Nguồn sẽ hiện trong câu trả lời khi API hỗ trợ"
-                  disabled={isDemoMode}
-                  onChange={(checked) => updateSettings({ citations: checked })}
-                />
-              </div>
             </div>
-          </details>
-        </section>
 
-        <div className="chat-layout">
-          <section className="chat-panel" aria-label="Cuộc trò chuyện">
-            <div className="model-context">
-              <div>
-                <Bot size={18} />
-                <strong className="skill-command">{activeSkillCommand}</strong>
-                <span>{activeTask.title}</span>
+            <div className="chat-utility-row">
+              <div className="model-context">
+                <div>
+                  <Bot size={18} />
+                  <strong className="skill-command">{activeSkillCommand}</strong>
+                  <span>{activeTask.title}</span>
+                </div>
+                <div>
+                  <Clock3 size={18} />
+                  <strong>{reasoningLabels[settings.reasoningEffort]}</strong>
+                  <span>độ sâu suy luận</span>
+                </div>
+                <div>
+                  <MessageSquareText size={18} />
+                  <strong>{visibleMessages.length}</strong>
+                  <span>tin trong phiên</span>
+                </div>
+                <div>
+                  <Image size={18} />
+                  <strong>{composerMode === 'image' ? imageGenerationModelLabel : activeModel.label}</strong>
+                  <span>{composerMode === 'image' ? 'model tạo ảnh' : 'model chat'}</span>
+                </div>
               </div>
-              <div>
-                <Clock3 size={18} />
-                <strong>{reasoningLabels[settings.reasoningEffort]}</strong>
-                <span>độ sâu suy luận</span>
-              </div>
-              <div>
-                <MessageSquareText size={18} />
-                <strong>{visibleMessages.length}</strong>
-                <span>tin trong phiên</span>
-              </div>
-              <div>
-                <Image size={18} />
-                <strong>{composerMode === 'image' ? imageGenerationModelLabel : activeModel.label}</strong>
-                <span>{composerMode === 'image' ? 'model tạo ảnh' : 'model chat'}</span>
-              </div>
+
+              <section className="control-strip" aria-label="Cấu hình nhanh">
+                <details className="quick-settings">
+                  <summary>Tùy chỉnh đầu ra</summary>
+                  <div className="quick-settings-body">
+                    <div className="segmented" aria-label="Giọng văn">
+                      {toneOptions.map((tone) => (
+                        <button
+                          className={settings.tone === tone ? 'is-selected' : ''}
+                          key={tone}
+                          type="button"
+                          disabled={isDemoMode}
+                          onClick={() => updateSettings({ tone })}
+                        >
+                          {tone}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="quick-controls">
+                      <label className="select-label">
+                        Độ dài
+                        <select
+                          value={settings.outputLength}
+                          disabled={isDemoMode}
+                          onChange={(event) => updateSettings({ outputLength: event.target.value })}
+                        >
+                          {lengthOptions.map((option) => (
+                            <option key={option}>{option}</option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <Toggle
+                        checked={settings.useWeb}
+                        label="Tìm web"
+                        hint="Sẽ dùng khi backend hỗ trợ"
+                        disabled={isDemoMode}
+                        onChange={(checked) => updateSettings({ useWeb: checked })}
+                      />
+                      <Toggle
+                        checked={settings.citations}
+                        label="Trích dẫn"
+                        hint="Nguồn sẽ hiện trong câu trả lời khi API hỗ trợ"
+                        disabled={isDemoMode}
+                        onChange={(checked) => updateSettings({ citations: checked })}
+                      />
+                    </div>
+                  </div>
+                </details>
+              </section>
             </div>
 
             <div className="active-skill-banner" aria-label="Skill đang áp dụng trong chat">

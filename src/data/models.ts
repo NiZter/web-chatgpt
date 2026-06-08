@@ -35,4 +35,4 @@ export const modelOptions: ModelOption[] = [
   },
 ];
 
-export const defaultModelId = 'gpt-5.4-mini';
+export const defaultModelId = 'gpt-5.5';
