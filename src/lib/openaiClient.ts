@@ -6,6 +6,7 @@ export type AssistantRequest = {
   attachments?: MessageAttachment[];
   settings: AssistantSettings;
   taskInstruction: string;
+  userKey?: string;
 };
 
 export type AssistantResponse = {
@@ -106,6 +107,7 @@ export function toResponsesPayload(request: AssistantRequest) {
   const payload: {
     model: string;
     instructions: string;
+    user_key?: string;
     input: Array<{
       role: 'user' | 'assistant';
       content: InputContent;
@@ -116,6 +118,7 @@ export function toResponsesPayload(request: AssistantRequest) {
   } = {
     model: request.settings.model,
     instructions: buildDeveloperInstructions(request),
+    ...(request.userKey ? { user_key: request.userKey } : {}),
     input: buildConversationInput(request),
     text: {
       verbosity: toTextVerbosity(request.settings.outputLength),

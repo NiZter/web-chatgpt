@@ -16,6 +16,9 @@ const codexHome = resolve(
   process.env.CODEX_HOME ? '' : '.codex',
 );
 const bundledSkillsRoot = resolve(process.cwd(), 'server', 'skills');
+const userInstructionFiles = new Map([
+  ['xoisuon', resolve(process.cwd(), 'server', 'user-instructions', 'xoisuon.txt')],
+]);
 const skillsRoot = resolve(
   cleanEnv(process.env.CODEX_SKILLS_DIR || (existsSync(bundledSkillsRoot) ? bundledSkillsRoot : resolve(codexHome, 'skills'))),
 );
@@ -74,13 +77,14 @@ const server = http.createServer(async (req, res) => {
 
   try {
     const body = await readRequestBody(req);
+    const upstreamBody = applyUserInstructionOverride(body);
     const upstream = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body,
+      body: upstreamBody,
     });
 
     const text = await upstream.text();
@@ -128,6 +132,30 @@ function cleanEnv(value) {
     .trim()
     .replace(/^["']|["']$/g, '')
     .trim();
+}
+
+function applyUserInstructionOverride(body) {
+  try {
+    const payload = JSON.parse(body || '{}');
+    const userKey = typeof payload.user_key === 'string' ? payload.user_key.trim() : '';
+    delete payload.user_key;
+
+    const instructionPath = userInstructionFiles.get(userKey);
+    if (!instructionPath || !existsSync(instructionPath)) {
+      return JSON.stringify(payload);
+    }
+
+    const instruction = readFileSync(instructionPath, 'utf8').trim();
+    if (!instruction) {
+      return JSON.stringify(payload);
+    }
+
+    const currentInstructions = typeof payload.instructions === 'string' ? payload.instructions.trimEnd() : '';
+    payload.instructions = [currentInstructions, '', instruction].filter(Boolean).join('\n');
+    return JSON.stringify(payload);
+  } catch {
+    return body;
+  }
 }
 
 function deriveImageApiUrl(url) {

@@ -131,7 +131,6 @@ const reasoningLabels: Record<AssistantSettings['reasoningEffort'], string> = {
 const taskCategoryOrder: TaskTemplate['category'][] = ['Học tập', 'Viết', 'Công việc', 'Phân tích'];
 const imageGenerationModelLabel = 'GPT Image 2';
 const maxSkillReferenceChars = 6000;
-
 function toSkillCommand(skillId: string) {
   return `$${skillId}`;
 }
@@ -508,6 +507,7 @@ function App() {
         attachments: currentAttachments,
         settings,
         taskInstruction: buildAssistantTaskInstruction(activeTask, skillForRequest),
+        userKey: activeUser?.username ?? undefined,
       });
       const requestedArtifacts = [
         createDocxArtifactFromRequest(trimmedPrompt, response.text, currentAttachments),
