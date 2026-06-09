@@ -130,9 +130,16 @@ const reasoningLabels: Record<AssistantSettings['reasoningEffort'], string> = {
 };
 const taskCategoryOrder: TaskTemplate['category'][] = ['Học tập', 'Viết', 'Công việc', 'Phân tích'];
 const imageGenerationModelLabel = 'GPT Image 2';
+const maxSkillReferenceChars = 6000;
 
 function toSkillCommand(skillId: string) {
   return `$${skillId}`;
+}
+
+function limitPromptSection(value: string, maxChars: number) {
+  const normalized = value.replace(/\r\n/g, '\n').trim();
+  if (normalized.length <= maxChars) return normalized;
+  return `${normalized.slice(0, maxChars).trimEnd()}\n\n[Đã rút gọn phần tham khảo skill local.]`;
 }
 
 function readStoredAuthSession(): StoredAuthSession | null {
@@ -500,20 +507,7 @@ function App() {
         messages: [...messages, userMessage],
         attachments: currentAttachments,
         settings,
-        taskInstruction: [
-          `Tác vụ: ${activeTask.title}`,
-          `Skill áp dụng: ${skillForRequest.label} (${skillForRequest.id})`,
-          `Nguồn skill: ${skillForRequest.source === 'local-skill-md' ? 'SKILL.md local' : 'fallback rút gọn'}`,
-          `Định dạng tác vụ: ${activeTask.prompt}`,
-          'Nội dung SKILL.md:',
-          skillForRequest.instruction,
-          '',
-          'Ràng buộc của web app này:',
-          '- Không được giả vờ chạy shell, gọi tool, tạo plan JSON, hoặc nói rằng bạn đang dò workspace.',
-          '- Bạn chỉ có dữ liệu người dùng nhập và tệp đính kèm đã được trích nội dung trong prompt.',
-          '- Nếu người dùng yêu cầu tạo file DOCX/PDF/PPTX/XLSX, hãy trả về nội dung cần đưa vào file. UI sẽ tạo nút tải file khi hỗ trợ.',
-          '- Nếu tệp đính kèm đã có nội dung trích xuất, dùng nội dung đó; không bảo người dùng gửi lại file.',
-        ].join('\n'),
+        taskInstruction: buildAssistantTaskInstruction(activeTask, skillForRequest),
       });
       const requestedArtifacts = [
         createDocxArtifactFromRequest(trimmedPrompt, response.text, currentAttachments),
@@ -556,6 +550,38 @@ function App() {
     } finally {
       setIsSending(false);
     }
+  }
+
+  function buildAssistantTaskInstruction(task: TaskTemplate, skill: LoadedTaskSkill) {
+    const fallbackSkill = getTaskSkillInstruction(task.skillId);
+    const localSkillReference =
+      skill.source === 'local-skill-md'
+        ? [
+            '',
+            'Tham khảo skill local, chỉ dùng các phần liên quan trực tiếp đến cách trả lời người dùng:',
+            limitPromptSection(skill.instruction, maxSkillReferenceChars),
+          ].join('\n')
+        : '';
+
+    return [
+      `Tác vụ: ${task.title}`,
+      `Mục tiêu tác vụ: ${task.description}`,
+      `Skill áp dụng: ${skill.label} (${skill.id})`,
+      `Nguồn skill: ${skill.source === 'local-skill-md' ? 'SKILL.md local, đã lọc theo ngữ cảnh web chat' : 'fallback rút gọn'}`,
+      '',
+      'Playbook trả lời ưu tiên:',
+      fallbackSkill.instruction,
+      '',
+      `Mẫu định dạng người dùng mong đợi: ${task.prompt}`,
+      localSkillReference,
+      '',
+      'Lưu ý khi dùng skill local:',
+      '- Chỉ lấy nguyên tắc chuyên môn phù hợp với câu hỏi.',
+      '- Bỏ qua các bước dành cho Codex/CLI/dev như đọc workspace, chạy shell, tạo thư mục, gọi script hoặc dùng công cụ ngoài web chat.',
+      '- Nếu skill local mâu thuẫn với playbook ưu tiên hoặc ràng buộc web app, dùng playbook ưu tiên.',
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
   async function copyLastAnswer() {
